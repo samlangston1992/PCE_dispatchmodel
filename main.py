@@ -42,7 +42,7 @@ result_DA = result_DA.rename(columns={'spot_price' : 'DA_price', 'power' : 'powe
 
 # Merge the two dataframes
 result_final = pd.concat([result_DA, result_spot], axis=1)
-
+result_final = result_final.drop_duplicates(subset='datetime')
 pd.options.display.float_format = '{:.2f}'.format
 
 # Create the profit column in result_final by calculating the profit from result_DA

@@ -1,9 +1,5 @@
 import pandas as pd
 import numpy as np
-import math
-from tqdm import tqdm
-from datetime import timedelta
-
 import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 
@@ -13,7 +9,6 @@ warnings.filterwarnings("ignore")
 from pyomo.environ import *
 from pyutilib.services import register_executable, registered_executable
 register_executable(name='glpsol')
-
 
 #define battery optimisation function
 def battery_optimisation(datetime, spot_price, initial_capacity=0, include_revenue=True, solver: str='glpk'):
@@ -38,22 +33,22 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     of each half-hour period and battery's raw power for each half-hour priod
     """
     # Battery's technical specification
+    DEG_FACTOR = 0 #applied to throughput 
     MIN_BATTERY_CAPACITY = 0
-    MAX_BATTERY_CAPACITY = 2
+    MAX_BATTERY_CAPACITY = 2 
     MAX_RAW_POWER = 1
     INITIAL_CAPACITY = initial_capacity # Default initial capacity will assume to be 0
-    EFFICIENCY = 0.938
+    EFFICIENCY = 0.938 # single leg efficiency
     MLF = 0.991 # Marginal Loss Factor
     MDR = 30 #Minimum discharge revenue
-    MAX_DAILY_THROUGHPUT =  MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 4
-    MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 3 * 365
-    MARGINAL_COST = MDR / ((MAX_BATTERY_CAPACITY / MAX_RAW_POWER) * (EFFICIENCY**2) * 2)
+    MAX_DAILY_THROUGHPUT =  MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 4 # redefine for degraded throughput
+    MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 3 * 365 # redefine for degraded throughput
+    MARGINAL_COST = MDR / ((MAX_BATTERY_CAPACITY / MAX_RAW_POWER) * (EFFICIENCY**2) * 2) # need to apply as cost of throughput
     LEAKAGE = 0
-    DEG_FACTOR = 0 #applied to throughput 
-    #need to define a minimum revenue per throughput
+    
+    
 
-
-
+    
     df = pd.DataFrame({'datetime': datetime, 'spot_price': spot_price}).reset_index(drop=True)
     df['period'] = df.index
     initial_period = 0
