@@ -11,7 +11,7 @@ from pyutilib.services import register_executable, registered_executable
 register_executable(name='glpsol')
 
 #define battery optimisation function
-def battery_optimisation(datetime, spot_price, initial_capacity=0, include_revenue=True, solver: str='glpk'):
+def battery_optimisation(datetime, spot_price, initial_capacity=0, initial_SoH = 2, include_revenue=True, solver: str='glpk'):
     """
     Determine the optimal charge and discharge behavior of a battery based 
     in Victoria. Assuming pure foresight of future spot prices over every 
@@ -33,10 +33,10 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     of each half-hour period and battery's raw power for each half-hour priod
     """
     # Battery's technical specification
-    DEG_FACTOR = 0 #applied to throughput 
     MIN_BATTERY_CAPACITY = 0
-    MAX_BATTERY_CAPACITY = 2 
+    MAX_BATTERY_CAPACITY = 2
     MAX_RAW_POWER = 1
+    DEG_FACTOR = MAX_BATTERY_CAPACITY * 0.01 #applied to throughput 
     INITIAL_CAPACITY = initial_capacity # Default initial capacity will assume to be 0
     EFFICIENCY = 0.938 # single leg efficiency
     MLF = 0.991 # Marginal Loss Factor
@@ -44,15 +44,15 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     MAX_DAILY_THROUGHPUT =  MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 4 # redefine for degraded throughput
     MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 3 * 365 # redefine for degraded throughput
     MARGINAL_COST = MDR / ((MAX_BATTERY_CAPACITY / MAX_RAW_POWER) * (EFFICIENCY**2) * 2) # need to apply as cost of throughput
-    LEAKAGE = 0
-    
-    
-
+    SELF_DISCHARGE_RATE = 0
     
     df = pd.DataFrame({'datetime': datetime, 'spot_price': spot_price}).reset_index(drop=True)
     df['period'] = df.index
     initial_period = 0
     final_period = df.index[-1]
+    
+    #Initialise SoH 
+    SoH = initial_SoH
     
     # Define model and solver
     battery = ConcreteModel()
@@ -64,7 +64,8 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     battery.Price = Param(initialize=list(df.spot_price), within=Any)
 
     # battery variables
-    battery.Capacity = Var(battery.Period, bounds=(MIN_BATTERY_CAPACITY, MAX_BATTERY_CAPACITY))
+    battery.SoH = Var(battery.Period, bounds=(MIN_BATTERY_CAPACITY, MAX_BATTERY_CAPACITY))
+    battery.Capacity = Var(battery.Period, bounds=(MIN_BATTERY_CAPACITY, None))
     battery.Charge_power = Var(battery.Period, bounds=(0, MAX_RAW_POWER))
     battery.Discharge_power = Var(battery.Period, bounds=(0, MAX_RAW_POWER))
     battery.PositiveDiff = Var(battery.Period, within=NonNegativeReals)
@@ -72,9 +73,7 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     battery.throughput_daily = Var(battery.Period, within=NonNegativeReals)
     battery.throughput_yearly = Var(battery.Period, within=NonNegativeReals)
     battery.profit = Var(battery.Period, within=Reals)  # Variable for profit in each period
-
-    # model deg impact on max cap
-    # - (((battery.Discharge_power[i-1] + battery.Charge_power[i-1]) / (2 * EFFICIENCY)) * DEG_FACTOR)
+      
 
     # Set constraints for the battery
     # Defining the battery objective (function to be maximise)
@@ -90,9 +89,19 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
             cost = df.spot_price[i] * (battery.Charge_power[i] / 2) / MLF
             battery.profit[i] = revenue - cost
 
+    def soh_constraint(battery, i):
+        if i == battery.Period.first():
+            return battery.SoH[i] == initial_SoH
+        else:
+            return battery.SoH[i] == battery.SoH[i-1] - (((battery.Discharge_power[i-1] + battery.Charge_power[i-1]) / (2 * EFFICIENCY)) * DEG_FACTOR)
+    
+    # Set upper bound for Capacity based on SoH
+    def capacity_upper_bound_rule(battery, t):
+        return battery.Capacity[t] <= battery.SoH[t]
+    
     # Make sure the battery does not charge above the limit
     def over_charge(battery, i):
-        return battery.Charge_power[i] <= (MAX_BATTERY_CAPACITY - battery.Capacity[i]) * 2 / EFFICIENCY
+        return battery.Charge_power[i] <= (battery.SoH[i] - battery.Capacity[i]) * 2 / EFFICIENCY
 
     # Make sure the battery discharge the amount it actually has
     def over_discharge(battery, i):
@@ -113,7 +122,7 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
         if i == battery.Period.first():
             return battery.Capacity[i] == INITIAL_CAPACITY
         # if not update the capacity normally    
-        return battery.Capacity[i] == (battery.Capacity[i-1] - LEAKAGE
+        return battery.Capacity[i] == (battery.Capacity[i-1] - SELF_DISCHARGE_RATE
                                         + (battery.Charge_power[i-1] / 2 * EFFICIENCY) 
                                         - (battery.Discharge_power[i-1] / 2))
     
@@ -163,7 +172,8 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     battery.yearly_throughput_accumulation_constraint = Constraint(battery.Period, rule=yearly_throughput_accumulation_constraint)
     battery.yearly_throughput_constraint = Constraint(battery.Period, rule=yearly_throughput_constraint)
     battery.objective = Objective(rule=maximise_profit, sense=maximize)
-
+    battery.soh_constraint = Constraint(battery.Period, rule=soh_constraint)
+    battery.capacity_upper_bound = Constraint(battery.Period, rule=capacity_upper_bound_rule)
 
     # Maximise the objective
     opt.solve(battery, tee=True)
@@ -172,16 +182,17 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     calculate_profit(battery)
 
     # unpack results
-    charge_power, discharge_power, capacity, spot_price, profit = ([] for i in range(5))
+    charge_power, discharge_power, capacity, spot_price, profit, SoH = ([] for i in range(6))
     for i in battery.Period:
         charge_power.append(battery.Charge_power[i].value)
         discharge_power.append(battery.Discharge_power[i].value)
         capacity.append(battery.Capacity[i].value)
         spot_price.append(battery.Price.extract_values_sparse()[None][i])
         profit.append(battery.profit[i].value)
+        SoH.append(battery.SoH[i].value)
 
     result = pd.DataFrame({'datetime':datetime, 'spot_price':spot_price, 'charge_power':charge_power,
-                           'discharge_power':discharge_power, 'opening_capacity':capacity, 'profit' : profit})
+                           'discharge_power':discharge_power, 'opening_capacity':capacity, 'profit' : profit, "SoH":SoH})
     
     # make sure it does not discharge & charge at the same time
     if not len(result[(result.charge_power != 0) & (result.discharge_power != 0)]) == 0:
@@ -200,8 +211,10 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, include_reven
     
     result['throughput'] = result['opening_capacity'].diff().abs().fillna(0)
     
-    result = result[['datetime', 'spot_price', 'power', 'market_dispatch', 'opening_capacity', 'throughput', 'profit']]
+    final_capacity = result['opening_capacity'].iloc[-1] - SELF_DISCHARGE_RATE + (result['charge_power'].iloc[-1] / 2 * EFFICIENCY) - (result['discharge_power'].iloc[-1] / 2 * EFFICIENCY)
 
-    final_capacity = result['opening_capacity'].iloc[-1]
-    
-    return result, final_capacity
+    SoH = result['SoH'].iloc[-1] - (((result['discharge_power'].iloc[-1] + result['charge_power'].iloc[-1]) / (2 * EFFICIENCY)) * DEG_FACTOR)
+
+    result = result[['datetime', 'spot_price', 'power', 'market_dispatch', 'opening_capacity', 'throughput', 'profit', 'SoH']]
+
+    return result, final_capacity, SoH
