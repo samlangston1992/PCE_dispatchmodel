@@ -5,9 +5,15 @@ from tqdm import tqdm
 from datetime import timedelta
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv("vic_test.csv")
-data = data.fillna(method='ffill')
-data['time'] = pd.to_datetime(data['time'])
+#data = pd.read_csv("vic_test.csv")
+#data = data.fillna(method='ffill')
+#data['time'] = pd.to_datetime(data['time'])
+
+from LCP_API import generate_prices
+
+data = generate_prices()
+
+
 
 #create loop to run above over each day
 days = data.groupby(data['time'].dt.date)

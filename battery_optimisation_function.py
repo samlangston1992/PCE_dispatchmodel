@@ -136,7 +136,7 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, initial_SoH =
         else:
             return battery.throughput_daily[i] == battery.throughput_daily[i - 1] + (battery.Discharge_power[i] + battery.Charge_power[i]) / (2 * EFFICIENCY)
 
-    def yearly_throughput_accumulation_constraint(battery, i):
+    def yearly_throughput_accumulation_constraint(battery, i): 
         if i == battery.Period.first():
             return battery.throughput_yearly[i] == (battery.Discharge_power[i] + battery.Charge_power[i]) / (2 * EFFICIENCY)
         else:
