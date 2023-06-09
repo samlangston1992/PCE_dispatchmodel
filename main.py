@@ -5,15 +5,13 @@ from tqdm import tqdm
 from datetime import timedelta
 
 #import data, fill blanks and set datetime column
-#data = pd.read_csv("vic_test.csv")
-#data = data.fillna(method='ffill')
-#data['time'] = pd.to_datetime(data['time'])
+data = pd.read_csv("GB_prices_2021.csv")
+data = data.fillna(method='ffill')
+data['time'] = pd.to_datetime(data['time'])
 
 from LCP_API import generate_prices
 
-data = generate_prices()
-
-
+#data = generate_prices()
 
 #create loop to run above over each day
 days = data.groupby(data['time'].dt.date)
@@ -61,8 +59,10 @@ pd.options.display.float_format = '{:.2f}'.format
 # and adding the net difference in market_dispatch multiplied by the spot_price
 result_final['profit'] = result_DA['profit_DA'] + ((result_spot['market_dispatch'] - result_DA['market_dispatch_DA']) * result_spot['spot_price'])
 
+result_final = result_final[~result_final['datetime'].duplicated(keep='first')] 
 # Rearrange the columns in the desired order
-result_final = result_final[['datetime', 'DA_price', 'spot_price', 'market_dispatch', 'opening_capacity', 'throughput', 'profit']]
+#result_final = result_final[['datetime', 'DA_price', 'spot_price', 'market_dispatch', 'opening_capacity', 'throughput', 'profit', 'SoH']]
+ # Remove duplicate timestamps
+result_final.to_csv('output.csv', index=False)
 
-print("Hello World")
 print(result_final)

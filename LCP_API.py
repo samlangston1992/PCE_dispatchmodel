@@ -31,7 +31,9 @@ def generate_prices():
     res_N2EX = requests.post('https://enactapifd.lcp.uk.com/EnactAPI/Series/Data', json=request, headers=headers)
     N2EX = res_N2EX.json()
     N2EX_df = pd.DataFrame(N2EX['data'][1:], columns=N2EX['data'][0])
-    N2EX_df.columns = ["Datetime", "Price_N2EX"]
+    N2EX_df.columns = ["time", "DA_price"]
+    N2EX_df['time'] = pd.to_datetime(N2EX_df['time'])
+    N2EX_df = N2EX_df.set_index('time').resample('30Min').ffill().reset_index()
 
 
     #Request APX prices
@@ -44,11 +46,12 @@ def generate_prices():
 
     res_APX = requests.post('https://enactapifd.lcp.uk.com/EnactAPI/Series/Data', json=request, headers=headers)
     APX = res_APX.json()
-    APX_df = pd.DataFrame(N2EX['data'][1:], columns=N2EX['data'][0])
-    APX_df.columns = ["Datetime", "Price_APX"]
+    APX_df = pd.DataFrame(APX['data'][1:], columns=APX['data'][0])
+    APX_df.columns = ["time", "spot_price"]
+    APX_df['time'] = pd.to_datetime(APX_df['time'])
 
 
-    merge_df = N2EX_df.merge(APX_df, on = "Datetime")
+    merge_df = N2EX_df.merge(APX_df, on = "time")
 
     return merge_df
 
@@ -57,7 +60,7 @@ if __name__ == '__main__':
     merged_prices = generate_prices()
 
 
-print("Hello World")
+print("Prices imported via LCP API")
 
 
 
