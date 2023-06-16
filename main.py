@@ -5,7 +5,7 @@ from tqdm import tqdm
 from datetime import timedelta
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv("GB_prices_2021.csv")
+data = pd.read_csv("vic_test.csv")
 data = data.fillna(method='ffill')
 data['time'] = pd.to_datetime(data['time'])
 
@@ -20,7 +20,7 @@ days = data.groupby(data['time'].dt.date)
 result_DA = []
 result_spot = []
 
-# Initialize initial_capacity and progress bar
+# Initialize initial_capacity and progress bar  #### add option to tweak DA vols?
 initial_capacity = 0
 initial_SoH = 2
 progress_bar = tqdm(days)
@@ -52,17 +52,15 @@ result_DA = result_DA.rename(columns={'spot_price' : 'DA_price', 'power' : 'powe
 
 # Merge the two dataframes
 result_final = pd.concat([result_DA, result_spot], axis=1)
-result_final = result_final.drop_duplicates(subset='datetime')
+result_final = result_final.drop_duplicates(subset='datetime', keep='first')
 pd.options.display.float_format = '{:.2f}'.format
 
 # Create the profit column in result_final by calculating the profit from result_DA
 # and adding the net difference in market_dispatch multiplied by the spot_price
-result_final['profit'] = result_DA['profit_DA'] + ((result_spot['market_dispatch'] - result_DA['market_dispatch_DA']) * result_spot['spot_price'])
+result_final['net_profit'] = result_DA['profit_DA'] + ((result_spot['market_dispatch'] - result_DA['market_dispatch_DA']) * result_spot['spot_price'])
 
 result_final = result_final[~result_final['datetime'].duplicated(keep='first')] 
-# Rearrange the columns in the desired order
-#result_final = result_final[['datetime', 'DA_price', 'spot_price', 'market_dispatch', 'opening_capacity', 'throughput', 'profit', 'SoH']]
- # Remove duplicate timestamps
-result_final.to_csv('output.csv', index=False)
+
+result_final.to_csv('output2.csv', index=False)
 
 print(result_final)
