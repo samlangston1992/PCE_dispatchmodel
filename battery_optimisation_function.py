@@ -11,13 +11,11 @@ from pyutilib.services import register_executable, registered_executable
 register_executable(name='glpsol')
 
 #define battery optimisation function
-def battery_optimisation(datetime, spot_price, initial_capacity=0, initial_SoH = 2, include_revenue=True, solver: str='glpk'):
+def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0, initial_SoH = 2, include_revenue=True, solver: str='glpk'):
     """
-    Determine the optimal charge and discharge behavior of a battery based 
-    in Victoria. Assuming pure foresight of future spot prices over every 
-    half-hour period to maximise the revenue.
-    PS: Assuming no degradation to the battery over the timeline and battery cannot
-        charge and discharge concurrently.
+    Determine the optimal charge and discharge behavior of a battery based on wholseale power market trading with half-hourly settlement periods.
+    Assuming perfect foresight of future power prices over every half-hour period to maximise the revenue.
+    
     ----------
     Parameters
     ----------
@@ -33,17 +31,17 @@ def battery_optimisation(datetime, spot_price, initial_capacity=0, initial_SoH =
     of each half-hour period and battery's raw power for each half-hour priod
     """
     # Battery's technical specification
-    MIN_BATTERY_CAPACITY = 0
-    MAX_BATTERY_CAPACITY = 2
-    MAX_RAW_POWER = 1
-    DEG_FACTOR = 0.00007 #applied to throughput 
-    INITIAL_CAPACITY = initial_capacity # Default initial capacity will assume to be 0
-    EFFICIENCY = 0.938 # single leg efficiency
-    MLF = 1 # Marginal Loss Factor
-    MARGINAL_COST = 50 #Minimum discharge revenue - is applied to total throughput (not just discharge)
-    MAX_DAILY_THROUGHPUT =  MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 4 # redefine for degraded throughput
+    MIN_BATTERY_CAPACITY = asset_params['MIN_BATTERY_CAPACITY']
+    MAX_BATTERY_CAPACITY = asset_params['MAX_BATTERY_CAPACITY']
+    MAX_RAW_POWER = asset_params['MAX_RAW_POWER']
+    DEG_FACTOR = asset_params['DEG_FACTOR']
+    INITIAL_CAPACITY = asset_params['INITIAL_CAPACITY']
+    EFFICIENCY = asset_params['EFFICIENCY']
+    MLF = asset_params['MLF']
+    MARGINAL_COST = asset_params['MARGINAL_COST']
+    MAX_DAILY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * asset_params['DAILY_HARD_CAP'] # redefine for degraded throughput
     MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 3 * 365 # redefine for degraded throughput
-    SELF_DISCHARGE_RATE = 0
+    SELF_DISCHARGE_RATE = asset_params['SELF_DISCHARGE_RATE']
     
     df = pd.DataFrame({'datetime': datetime, 'spot_price': spot_price}).reset_index(drop=True)
     df['period'] = df.index
