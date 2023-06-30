@@ -39,8 +39,8 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     EFFICIENCY = asset_params['EFFICIENCY']
     MLF = asset_params['MLF']
     MARGINAL_COST = asset_params['MARGINAL_COST']
-    MAX_DAILY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * asset_params['DAILY_HARD_CAP'] # redefine for degraded throughput
-    MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * (EFFICIENCY**2) * 2 * 3 * 365 # redefine for degraded throughput
+    MAX_DAILY_THROUGHPUT = MAX_BATTERY_CAPACITY * EFFICIENCY * 2 * asset_params['DAILY_HARD_CAP'] # redefine for degraded throughput
+    MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * EFFICIENCY * 2 * asset_params['SOFT_CAP'] * 365 # redefine for degraded throughput and apply correctly
     SELF_DISCHARGE_RATE = asset_params['SELF_DISCHARGE_RATE']
     
     df = pd.DataFrame({'datetime': datetime, 'spot_price': spot_price}).reset_index(drop=True)
@@ -127,20 +127,20 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     
     def daily_throughput_accumulation_constraint(battery, i):
         if i == battery.Period.first():
-            return battery.throughput_daily[i] == (battery.Discharge_power[i] + (battery.Charge_power[i] * EFFICIENCY)) / 2
-        if i % 48 == 0:
-            return battery.throughput_daily[i] == (battery.Discharge_power[i] + (battery.Charge_power[i] * EFFICIENCY)) / 2
+            return battery.throughput_daily[i] == ((battery.Discharge_power[i]  * EFFICIENCY) + battery.Charge_power[i]) / 2
+        if (i-1) % 48 == 0:
+            return battery.throughput_daily[i] == ((battery.Discharge_power[i]  * EFFICIENCY) + battery.Charge_power[i]) / 2
         else:
-            return battery.throughput_daily[i] == battery.throughput_daily[i - 1] + (battery.Discharge_power[i] + (battery.Charge_power[i] * EFFICIENCY)) / 2
+            return battery.throughput_daily[i] == battery.throughput_daily[i - 1] + ((battery.Discharge_power[i]  * EFFICIENCY) + battery.Charge_power[i]) / 2
 
     def yearly_throughput_accumulation_constraint(battery, i): 
         if i == battery.Period.first():
-            return battery.throughput_yearly[i] == (battery.Discharge_power[i] + (battery.Charge_power[i] * EFFICIENCY)) / 2
+            return battery.throughput_yearly[i] == ((battery.Discharge_power[i]  * EFFICIENCY) + battery.Charge_power[i]) / 2
         else:
-            if i % 17520 == 0:
-                return battery.throughput_yearly[i] == battery.throughput_yearly[i - 1] + (battery.Discharge_power[i] + (battery.Charge_power[i] * EFFICIENCY)) / 2
+            if (i-1) % 17520 == 0:
+                return battery.throughput_yearly[i] == battery.throughput_yearly[i - 1] + ((battery.Discharge_power[i]  * EFFICIENCY) + battery.Charge_power[i]) / 2
             else: 
-                return battery.throughput_yearly[i] == battery.throughput_yearly[i - 1] + (battery.Discharge_power[i] + (battery.Charge_power[i] * EFFICIENCY)) / 2
+                return battery.throughput_yearly[i] == battery.throughput_yearly[i - 1] + ((battery.Discharge_power[i]  * EFFICIENCY) + battery.Charge_power[i]) / 2
 
     def daily_throughput_constraint(battery, i):
     # Apply the maximum daily throughput constraint
@@ -162,6 +162,10 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
             return battery.profit_daily[i] >= battery.throughput_daily[i] * MARGINAL_COST
         else:
             return Constraint.Skip 
+        
+    def charge_discharge_constraint(battery, i): 
+        if battery.charge_power[i] != 0:
+            battery.discharge_power[i] = 0
     
    
     # Set constraint and objective for the battery
@@ -186,7 +190,7 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
 
     
     # unpack results
-    charge_power, discharge_power, capacity, throughput_daily, spot_price, profit, SoH, profit_daily = ([] for i in range(8))
+    charge_power, discharge_power, capacity, throughput_daily, throughput_yearly, spot_price, profit, SoH, profit_daily = ([] for i in range(9))
     for i in battery.Period:
         charge_power.append(battery.Charge_power[i].value)
         discharge_power.append(battery.Discharge_power[i].value)
@@ -196,15 +200,16 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
         SoH.append(battery.SoH[i].value)
         profit_daily.append(battery.profit_daily[i].value)
         throughput_daily.append(battery.throughput_daily[i].value)
+        throughput_yearly.append(battery.throughput_yearly[i].value)
 
     result = pd.DataFrame({'datetime':datetime, 'spot_price':spot_price, 'charge_power':charge_power,
-                           'discharge_power':discharge_power, 'throughput_daily' : throughput_daily, 
+                           'discharge_power':discharge_power, 'throughput_daily' : throughput_daily, 'throughput_yearly' : throughput_yearly,
                            'opening_capacity': capacity, 'profit' : profit, 'profit_daily' : profit_daily, "SoH": SoH})
     
     # make sure it does not discharge & charge at the same time
-    if not len(result[(result.charge_power != 0) & (result.discharge_power != 0)]) == 0:
-        print('Ops! The battery discharges & charges concurrently, the result has been returned')
-        return result
+    #if not len(result[(result.charge_power != 0) & (result.discharge_power != 0)]) == 0:
+        #print('Ops! The battery discharges & charges concurrently, the result has been returned')
+        #return result
     
     # convert columns charge_power & discharge_power to power
     result['power'] = np.where((result.charge_power > 0), 
@@ -216,12 +221,12 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
                                          result.power / 2,
                                          result.power / 2 * EFFICIENCY)
     
-    result['throughput'] = result['opening_capacity'].diff().abs().fillna(0)
+    result['throughput'] = result['market_dispatch'].abs().fillna(0) #Need to be consistent and clear how to define - absolute value of market dispatch?
     
     final_capacity = result['opening_capacity'].iloc[-1] - SELF_DISCHARGE_RATE + ((result['charge_power'].iloc[-1] * EFFICIENCY) / 2) - (result['discharge_power'].iloc[-1] / 2 )
 
     SoH = result['SoH'].iloc[-1] - (((result['discharge_power'].iloc[-1] + (result['charge_power'].iloc[-1] * EFFICIENCY)) / 2 ) * DEG_FACTOR)
 
-    result = result[['datetime', 'spot_price', 'power', 'market_dispatch', 'opening_capacity', 'throughput', 'throughput_daily', 'profit', 'profit_daily', 'SoH']]
+    result = result[['datetime', 'spot_price', 'power', 'market_dispatch', 'opening_capacity', 'throughput', 'throughput_daily', 'throughput_yearly', 'profit', 'profit_daily', 'SoH']]
 
     return result, final_capacity, SoH
