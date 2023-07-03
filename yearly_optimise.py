@@ -13,14 +13,14 @@ asset_params = {
     'INITIAL_CAPACITY': 0,
     'EFFICIENCY': 0.88, #RTE
     'MLF': 1,
-    'MARGINAL_COST': 0, #half the desired £/MWh minimum spread 
+    'MARGINAL_COST': 15, #half the desired £/MWh minimum spread 
     'DAILY_HARD_CAP': 4,
     'SOFT_CAP' : 3,
     'SELF_DISCHARGE_RATE': 0
 }
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv("GB_prices.csv")
+data = pd.read_csv("GB_prices.csv") #2024 = 2022, 2025 = 2021 etc.
 data = data.fillna(method='ffill')
 data['time'] = pd.to_datetime(data['time'], format='%d/%m/%Y %H:%M', dayfirst=True)
 
@@ -95,6 +95,6 @@ result_final["Net_profit"] = result_final["profit_DA"] + result_final['profit_ID
 
 result_final = result_final.loc[:, ~result_final.columns.duplicated()]
 
-result_final.to_csv('yearly_2018-2023.csv', index=False)
+result_final.to_csv('yearly_2018-2023_30MDR.csv', index=False)
 
 print(result_final)

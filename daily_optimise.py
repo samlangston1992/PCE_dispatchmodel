@@ -21,7 +21,7 @@ asset_params = {
 #import data, fill blanks and set datetime column
 data = pd.read_csv("vic_test.csv")
 data = data.fillna(method='ffill')
-data['time'] = pd.to_datetime(data['time'], format='%d/%m/%Y %H:%M')
+data['time'] = pd.to_datetime(data['time'], format='%d/%m/%Y %H:%M', dayfirst=True)
 
 from LCP_API import generate_prices
 
