@@ -159,7 +159,7 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
         
     def daily_profit_constraint(battery, i):
         if i == battery.Period.last():
-            return battery.profit_daily[i] >= battery.throughput_daily[i] * MARGINAL_COST
+            return battery.profit_daily[i] >= battery.throughput_daily[i] * MARGINAL_COST/2
         else:
             return Constraint.Skip 
         
@@ -222,11 +222,13 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
                                          result.power / 2 * EFFICIENCY)
     
     result['throughput'] = result['market_dispatch'].abs().fillna(0) #Need to be consistent and clear how to define - absolute value of market dispatch?
+
+    result['cycles'] = result['throughput'] / (result['SoH'] * 2)
     
     final_capacity = result['opening_capacity'].iloc[-1] - SELF_DISCHARGE_RATE + ((result['charge_power'].iloc[-1] * EFFICIENCY) / 2) - (result['discharge_power'].iloc[-1] / 2 )
 
     SoH = result['SoH'].iloc[-1] - (((result['discharge_power'].iloc[-1] + (result['charge_power'].iloc[-1] * EFFICIENCY)) / 2 ) * DEG_FACTOR)
 
-    result = result[['datetime', 'spot_price', 'power', 'market_dispatch', 'opening_capacity', 'throughput', 'throughput_daily', 'throughput_yearly', 'profit', 'profit_daily', 'SoH']]
+    result = result[['datetime', 'spot_price', 'power', 'market_dispatch', 'opening_capacity', 'throughput', 'throughput_daily', 'throughput_yearly', 'cycles', 'profit', 'profit_daily', 'SoH']]
 
     return result, final_capacity, SoH
