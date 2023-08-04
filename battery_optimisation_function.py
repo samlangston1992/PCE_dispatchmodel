@@ -11,7 +11,7 @@ from pyutilib.services import register_executable, registered_executable
 register_executable(name='glpsol')
 
 #define battery optimisation function
-def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0, initial_SoH = 2, include_revenue=True, solver: str='glpk'):
+def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0, initial_SoH = 2.35, include_revenue=True, solver: str='glpk'):
     """
     Determine the optimal charge and discharge behavior of a battery based on wholseale power market trading with half-hourly settlement periods.
     Assuming perfect foresight of future power prices over every half-hour period to maximise the revenue.
@@ -30,6 +30,10 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     A dataframe that contains battery's opening capacity for each half-hour period, spot price
     of each half-hour period and battery's raw power for each half-hour priod
     """
+
+    #Initialise SoH 
+    SoH = initial_SoH
+
     # Battery's technical specification
     MIN_BATTERY_CAPACITY = asset_params['MIN_BATTERY_CAPACITY']
     MAX_BATTERY_CAPACITY = asset_params['MAX_BATTERY_CAPACITY']
@@ -39,7 +43,7 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     EFFICIENCY = asset_params['EFFICIENCY']
     MLF = asset_params['MLF']
     MARGINAL_COST = asset_params['MARGINAL_COST']
-    MAX_DAILY_THROUGHPUT = MAX_BATTERY_CAPACITY * EFFICIENCY * 2 * asset_params['DAILY_HARD_CAP'] # redefine for degraded throughput
+    MAX_DAILY_THROUGHPUT = SoH * sqrt(EFFICIENCY) * 2 * asset_params['DAILY_HARD_CAP'] # redefine for degraded throughput
     MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * EFFICIENCY * 2 * asset_params['SOFT_CAP'] * 365 # redefine for degraded throughput and apply correctly
     SELF_DISCHARGE_RATE = asset_params['SELF_DISCHARGE_RATE']
     
@@ -48,9 +52,7 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     initial_period = 0
     final_period = df.index[-1]
     
-    #Initialise SoH 
-    SoH = initial_SoH
-    
+   
     # Define model and solver
     battery = ConcreteModel()
     opt = SolverFactory(solver)
@@ -223,7 +225,7 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     
     result['throughput'] = result['market_dispatch'].abs().fillna(0) #Need to be consistent and clear how to define - absolute value of market dispatch?
 
-    result['cycles'] = result['throughput'] / (result['SoH'] * 2)
+    result['cycles'] = result['throughput'] / (result['SoH'] * 2 * sqrt(EFFICIENCY))
     
     final_capacity = result['opening_capacity'].iloc[-1] - SELF_DISCHARGE_RATE + ((result['charge_power'].iloc[-1] * EFFICIENCY) / 2) - (result['discharge_power'].iloc[-1] / 2 )
 
