@@ -43,8 +43,8 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
     EFFICIENCY = asset_params['EFFICIENCY']
     MLF = asset_params['MLF']
     MARGINAL_COST = asset_params['MARGINAL_COST']
-    MAX_DAILY_THROUGHPUT = SoH * sqrt(EFFICIENCY) * 2 * asset_params['DAILY_HARD_CAP'] # redefine for degraded throughput
-    MAX_YEARLY_THROUGHPUT = MAX_BATTERY_CAPACITY * EFFICIENCY * 2 * asset_params['SOFT_CAP'] * 365 # redefine for degraded throughput and apply correctly
+    MAX_DAILY_THROUGHPUT = SoH * sqrt(EFFICIENCY) * 2 * asset_params['DAILY_HARD_CAP'] 
+    MAX_YEARLY_THROUGHPUT = SoH * sqrt(EFFICIENCY) * 2 * asset_params['SOFT_CAP'] * 365 
     SELF_DISCHARGE_RATE = asset_params['SELF_DISCHARGE_RATE']
     
     df = pd.DataFrame({'datetime': datetime, 'spot_price': spot_price}).reset_index(drop=True)
@@ -223,7 +223,7 @@ def battery_optimisation(datetime, spot_price, asset_params, initial_capacity=0,
                                          result.power / 2,
                                          result.power / 2 * EFFICIENCY)
     
-    result['throughput'] = result['market_dispatch'].abs().fillna(0) #Need to be consistent and clear how to define - absolute value of market dispatch?
+    result['throughput'] = result['market_dispatch'].abs().fillna(0) 
 
     result['cycles'] = result['throughput'] / (result['SoH'] * 2 * sqrt(EFFICIENCY))
     

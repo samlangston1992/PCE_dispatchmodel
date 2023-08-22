@@ -9,7 +9,7 @@ os.environ['PYDEVD_WARN_EVALUATION_TIMEOUT'] = '10000'
 # Define the asset parameters dictionary
 asset_params = {
     'MIN_BATTERY_CAPACITY': 0,
-    'MAX_BATTERY_CAPACITY': 2.2325,
+    'MAX_BATTERY_CAPACITY': 2.35,
     'MAX_RAW_POWER': 1,
     'DEG_FACTOR': 0.00007, #initialise
     'INITIAL_CAPACITY': 0,
