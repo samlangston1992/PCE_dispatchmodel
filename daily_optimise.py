@@ -9,9 +9,9 @@ os.environ['PYDEVD_WARN_EVALUATION_TIMEOUT'] = '10000'
 # Define the asset parameters dictionary
 asset_params = {
     'MIN_BATTERY_CAPACITY': 0,
-    'MAX_BATTERY_CAPACITY': 2.35,
+    'MAX_BATTERY_CAPACITY': 1.0,
     'MAX_RAW_POWER': 1,
-    'DEG_FACTOR': 0.00007, #initialise
+    'DEG_FACTOR': 0, #Initialise
     'INITIAL_CAPACITY': 0,
     'EFFICIENCY': 0.88, #RTE
     'MLF': 1,
@@ -22,7 +22,7 @@ asset_params = {
 }
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv("GB_prices_2022.csv")
+data = pd.read_csv("GB_prices_sinceGL.csv")
 data = data.fillna(method='ffill')
 data['time'] = pd.to_datetime(data['time'], format='%d/%m/%Y %H:%M', dayfirst=True)
 
@@ -46,9 +46,9 @@ progress_bar = tqdm(days)
 def update_deg_factor(asset_params, current_soh):
     # Check the current SoH value or any other relevant condition
     if current_soh <= (asset_params['MAX_BATTERY_CAPACITY'] * 0.903):  # Example condition: Change DEG_FACTOR if SoH falls below 0.8
-        asset_params['DEG_FACTOR'] = 0.000045/2  # Set the new DEG_FACTOR value here
+        asset_params['DEG_FACTOR'] = 0  # Set the new DEG_FACTOR value here #0.000045/2 
     else:
-        asset_params['DEG_FACTOR'] = 0.00015/2  # Set the original DEG_FACTOR value here or any other value you want
+        asset_params['DEG_FACTOR'] = 0  # Set the original DEG_FACTOR value here or any other value you want # 0.00015/2
 
 # Iterate over each day's data and run the battery optimization algorithm
 #need to loop for DA then ID then calulate the difference to create final position then
@@ -123,7 +123,7 @@ daily_summary = result_final.groupby(result_final['datetime'].dt.date)[['profit_
 print(result_final)
 
 # Create a Pandas ExcelWriter object to write to the Excel file
-with pd.ExcelWriter('test_SoH_2022.xlsx') as writer:
+with pd.ExcelWriter('sinceGL.xlsx') as writer:
     # Write result_final to the first worksheet
     result_final.to_excel(writer, sheet_name='Result_Final', index=False)
 

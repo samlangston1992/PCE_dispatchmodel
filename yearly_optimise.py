@@ -7,13 +7,13 @@ from datetime import timedelta
 # Define the asset parameters dictionary
 asset_params = {
     'MIN_BATTERY_CAPACITY': 0,
-    'MAX_BATTERY_CAPACITY': 2.35,
+    'MAX_BATTERY_CAPACITY': 100,
     'MAX_RAW_POWER': 1,
     'DEG_FACTOR': 0.00005, #0.0000225 need to ratchet
     'INITIAL_CAPACITY': 0,
     'EFFICIENCY': 0.88, #RTE
     'MLF': 1,
-    'MARGINAL_COST': 15, #half the desired £/MWh minimum spread 
+    'MARGINAL_COST': 0, #half the desired £/MWh minimum spread 
     'DAILY_HARD_CAP': 4,
     'SOFT_CAP' : 3,
     'SELF_DISCHARGE_RATE': 0
@@ -35,6 +35,13 @@ years = data.groupby(data['time'].dt.year)
 result_DA = []
 result_spot = []
 result_CO = []
+
+def update_deg_factor(asset_params, current_soh):
+    # Check the current SoH value or any other relevant condition
+    if current_soh <= (asset_params['MAX_BATTERY_CAPACITY'] * 0.903):  # Example condition: Change DEG_FACTOR if SoH falls below 0.8
+        asset_params['DEG_FACTOR'] = 0  # Set the new DEG_FACTOR value here #0.000045/2 
+    else:
+        asset_params['DEG_FACTOR'] = 0  # Set the original DEG_FACTOR value here or any other value you want # 0.00015/2
 
 # Initialize initial_capacity and progress bar  #### add option to tweak DA vols?
 initial_capacity = 0
@@ -95,6 +102,6 @@ result_final["Net_profit"] = result_final["profit_DA"] + result_final['profit_ID
 
 result_final = result_final.loc[:, ~result_final.columns.duplicated()]
 
-result_final.to_csv('yearly_2018-2023_30MDR.csv', index=False)
+result_final.to_csv('yearly_100hr.csv', index=False)
 
 print(result_final)
