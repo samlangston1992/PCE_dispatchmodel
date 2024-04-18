@@ -9,20 +9,20 @@ os.environ['PYDEVD_WARN_EVALUATION_TIMEOUT'] = '10000'
 # Define the asset parameters dictionary
 asset_params = {
     'MIN_BATTERY_CAPACITY': 0,
-    'MAX_BATTERY_CAPACITY': 1.0,
+    'MAX_BATTERY_CAPACITY': 1,
     'MAX_RAW_POWER': 1,
     'DEG_FACTOR': 0, #Initialise
     'INITIAL_CAPACITY': 0,
-    'EFFICIENCY': 0.88, #RTE
+    'EFFICIENCY': 0.88, #RTE 
     'MLF': 1,
     'MARGINAL_COST': 0, #minimum discharge profit
-    'DAILY_HARD_CAP': 2,
-    'SOFT_CAP' : 2,
+    'DAILY_HARD_CAP': 5,
+    'SOFT_CAP' : 5,
     'SELF_DISCHARGE_RATE': 0
 }
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv("GB_prices_sinceGL.csv")
+data = pd.read_csv("GB_prices_April8-14.csv")
 data = data.fillna(method='ffill')
 data['time'] = pd.to_datetime(data['time'], format='%d/%m/%Y %H:%M', dayfirst=True)
 
@@ -123,7 +123,7 @@ daily_summary = result_final.groupby(result_final['datetime'].dt.date)[['profit_
 print(result_final)
 
 # Create a Pandas ExcelWriter object to write to the Excel file
-with pd.ExcelWriter('sinceGL.xlsx') as writer:
+with pd.ExcelWriter('April1-8.xlsx') as writer:
     # Write result_final to the first worksheet
     result_final.to_excel(writer, sheet_name='Result_Final', index=False)
 

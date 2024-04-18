@@ -8,6 +8,8 @@ warnings.filterwarnings("ignore")
 
 from pyomo.environ import *
 from pyutilib.services import register_executable, registered_executable
+
+#solver_path = r'C:\Users\SamLangston\Github\PCE_dispatchmodel\PCE_dispatchmodel\.conda\Lib\site-packages\pyomo\solvers\plugins\converter\glpsol.py'
 register_executable(name='glpsol')
 
 #define battery optimisation function
