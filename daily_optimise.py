@@ -1,34 +1,46 @@
 import pandas as pd
 from datetime import timedelta
 from battery_optimisation_function import battery_optimisation
+import datetime as dt
 from tqdm import tqdm
-from datetime import timedelta
 import os
 os.environ['PYDEVD_WARN_EVALUATION_TIMEOUT'] = '10000'
 
 # Define the asset parameters dictionary
 asset_params = {
     'MIN_BATTERY_CAPACITY': 0,
-    'MAX_BATTERY_CAPACITY': 1,
+    'MAX_BATTERY_CAPACITY': 1.2,
     'MAX_RAW_POWER': 1,
     'DEG_FACTOR': 0, #Initialise
     'INITIAL_CAPACITY': 0,
     'EFFICIENCY': 0.88, #RTE 
     'MLF': 1,
     'MARGINAL_COST': 0, #minimum discharge profit
-    'DAILY_HARD_CAP': 5,
-    'SOFT_CAP' : 5,
+    'DAILY_HARD_CAP': 4,
+    'SOFT_CAP' : 4,
     'SELF_DISCHARGE_RATE': 0
 }
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv("GB_prices_April8-14.csv")
+data = pd.read_csv('C:/Users/SamLangston/Documents/R/Outputs/prices.csv')
 data = data.fillna(method='ffill')
-data['time'] = pd.to_datetime(data['time'], format='%d/%m/%Y %H:%M', dayfirst=True)
+data = data.drop(['NIV'], axis=1)
+data.rename(columns={'Datetime_local': 'time', 
+                       'Price_N2EX': 'DA_price', 
+                       'Price_APX': 'spot_price', 
+                       'Price_CO': 'CO_price'}, inplace=True)
 
-from LCP_API import generate_prices
+#Set start and end dates and filter
+#Filter for since 2021
+data['time'] = pd.to_datetime(data['time'])
+start = pd.Timestamp(dt.date(2023, 11, 1))
+data = data[(data['time'] >= start)]
+cutoff = pd.Timestamp(dt.datetime.today().replace(hour=0, minute=0,
+                                                       second=0,
+                                                       microsecond=0))
+data = data[(data['time'] < cutoff)]
 
-#data = generate_prices()
+
 
 #create loop to run above over each day
 days = data.groupby(data['time'].dt.date)
@@ -46,9 +58,9 @@ progress_bar = tqdm(days)
 def update_deg_factor(asset_params, current_soh):
     # Check the current SoH value or any other relevant condition
     if current_soh <= (asset_params['MAX_BATTERY_CAPACITY'] * 0.903):  # Example condition: Change DEG_FACTOR if SoH falls below 0.8
-        asset_params['DEG_FACTOR'] = 0  # Set the new DEG_FACTOR value here #0.000045/2 
+        asset_params['DEG_FACTOR'] = 0.000045/2  # Set the new DEG_FACTOR value here #0.000045/2 
     else:
-        asset_params['DEG_FACTOR'] = 0  # Set the original DEG_FACTOR value here or any other value you want # 0.00015/2
+        asset_params['DEG_FACTOR'] = 0.00015/2  # Set the original DEG_FACTOR value here or any other value you want # 0.00015/2
 
 # Iterate over each day's data and run the battery optimization algorithm
 #need to loop for DA then ID then calulate the difference to create final position then
@@ -119,11 +131,10 @@ summary_table = result_final[['profit_DA', 'profit_ID', 'profit_CO', 'Net_profit
 daily_summary = result_final.groupby(result_final['datetime'].dt.date)[['profit_DA', 'throughput_DA', 'profit_ID', 
                                                                         'throughput_ID', 'profit_CO', 'throughput_CO', 'cycles_CO', 'Net_profit']].sum()
 
-
-print(result_final)
+filename = input("Enter the filename (e.g., April2024.xlsx): ")
 
 # Create a Pandas ExcelWriter object to write to the Excel file
-with pd.ExcelWriter('April1-8.xlsx') as writer:
+with pd.ExcelWriter(filename) as writer:
     # Write result_final to the first worksheet
     result_final.to_excel(writer, sheet_name='Result_Final', index=False)
 
