@@ -9,20 +9,20 @@ os.environ['PYDEVD_WARN_EVALUATION_TIMEOUT'] = '10000'
 # Define the asset parameters dictionary
 asset_params = {
     'MIN_BATTERY_CAPACITY': 0,
-    'MAX_BATTERY_CAPACITY': 1.2,
+    'MAX_BATTERY_CAPACITY': 2.3,
     'MAX_RAW_POWER': 1,
     'DEG_FACTOR': 0, #Initialise
     'INITIAL_CAPACITY': 0,
     'EFFICIENCY': 0.88, #RTE 
     'MLF': 1,
     'MARGINAL_COST': 0, #minimum discharge profit
-    'DAILY_HARD_CAP': 4,
+    'DAILY_HARD_CAP': 3,
     'SOFT_CAP' : 4,
     'SELF_DISCHARGE_RATE': 0
 }
 
 #import data, fill blanks and set datetime column
-data = pd.read_csv('C:/Users/SamLangston/Documents/R/Outputs/prices.csv')
+data = pd.read_csv(r'C:\Users\SamLangston\OneDrive - Pulse Clean Energy Limited\Documents 1\PCE_dispatchmodel\GB_prices_2022.csv')
 data = data.fillna(method='ffill')
 data = data.drop(['NIV'], axis=1)
 data.rename(columns={'Datetime_local': 'time', 
